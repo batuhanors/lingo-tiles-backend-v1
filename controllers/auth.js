@@ -2,6 +2,7 @@ import User from "../models/userSchema.js";
 import OTP from "../models/otpSchema.js";
 import bcrypt from "bcrypt";
 import nodemailer from "nodemailer";
+import jwt from "jsonwebtoken";
 import { config } from "dotenv";
 
 config();
@@ -34,7 +35,10 @@ export const LoginController = async (req, res) => {
     }
     bcrypt.compare(password, user.password).then((result) => {
       if (result) {
-        return res.status(200).json({ message: "logged in" });
+        const token = jwt.sign({ _id: user._id }, process.env.JWT_SECRET_KEY, {
+          expiresIn: "7d",
+        });
+        return res.status(200).json({ token });
       } else {
         return res.status(401).json({ message: "incorrect credentials" });
       }
@@ -141,5 +145,21 @@ export const verifyRegistrationController = async (req, res) => {
       });
   } catch (error) {
     return res.status(500).json({ message: error.message });
+  }
+};
+
+export const createSessionController = async (req, res) => {
+  try {
+    const token = req.body.token;
+    const decodedToken = jwt.verify(token, process.env.JWT_SECRET_KEY);
+    return res.status(200).json({ decodedToken });
+  } catch (error) {
+    if (error instanceof jwt.JsonWebTokenError) {
+      res.status(401).json({ error: "Invalid token" });
+    } else if (error instanceof jwt.TokenExpiredError) {
+      res.status(401).json({ error: "Expired token" });
+    } else {
+      res.status(500).json({ error: "Internal server error" });
+    }
   }
 };
